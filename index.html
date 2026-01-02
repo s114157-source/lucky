@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>線上求籤筒 - 每日運勢</title>
+    <style>
+        :root {
+            --main-red: #c0392b;
+            --gold: #f1c40f;
+            --wood: #e67e22;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+            background-color: #fdf2e9;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        h1 {
+            color: var(--main-red);
+            text-shadow: 1px 1px 0px #fff;
+            margin-bottom: 50px;
+        }
+
+        /* 籤筒容器 */
+        .bucket-container {
+            position: relative;
+            cursor: pointer;
+            width: 150px;
+            height: 200px;
+            transition: transform 0.2s;
+        }
+
+        .bucket-container:hover {
+            transform: scale(1.05);
+        }
+
+        /* 籤筒本體 */
+        .bucket {
+            width: 100%;
+            height: 100%;
+            background: var(--main-red);
+            border-radius: 10px 10px 50px 50px;
+            border: 4px solid #8e1b0f;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            z-index: 5;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .bucket-text {
+            color: var(--gold);
+            font-size: 28px;
+            font-weight: bold;
+            writing-mode: vertical-rl;
+            letter-spacing: 5px;
+            border: 2px solid var(--gold);
+            padding: 10px 5px;
+        }
+
+        /* 籤支 */
+        .stick {
+            width: 30px;
+            height: 150px;
+            background: var(--wood);
+            border: 2px solid #d35400;
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-radius: 5px;
+        }
+
+        /* 搖晃動畫 */
+        @keyframes shake {
+            0% { transform: rotate(0deg); }
+            20% { transform: rotate(15deg); }
+            40% { transform: rotate(-15deg); }
+            60% { transform: rotate(10deg); }
+            80% { transform: rotate(-10deg); }
+            100% { transform: rotate(0deg); }
+        }
+
+        .shaking {
+            animation: shake 0.6s ease-in-out infinite;
+        }
+
+        .stick-out {
+            transform: translate(-50%, -130px);
+        }
+
+        /* 結果彈窗 */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal {
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 90%;
+            width: 400px;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+        }
+
+        .fortune-img {
+            max-width: 250px;
+            height: auto;
+            margin-bottom: 20px;
+            border-radius: 10px;
+        }
+
+        .info-box {
+            background: #f9f9f9;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 5px solid var(--main-red);
+        }
+
+        .lucky-color-tag {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            margin-top: 5px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .desc-text {
+            color: #555;
+            margin-top: 10px;
+            line-height: 1.6;
+        }
+
+        .btn {
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: var(--main-red);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+
+        .btn:hover {
+            background: #a93226;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🏮 每日神準求籤 🏮</h1>
+
+    <div class="bucket-container" id="drawZone" onclick="startDraw()">
+        <div class="stick" id="stick"></div>
+        <div class="bucket" id="bucket">
+            <div class="bucket-text">求籤</div>
+        </div>
+    </div>
+
+    <p style="margin-top: 40px; color: #8e1b0f;">點擊籤筒，誠心求一籤</p>
+
+    <div class="overlay" id="overlay">
+        <div class="modal">
+            <h2 id="result-title">您的抽籤結果</h2>
+            <img id="fortune-img" src="" alt="運勢圖片" class="fortune-img">
+            
+            <div class="info-box">
+                <div><strong>今日幸運色</strong></div>
+                <div id="lucky-color" class="lucky-color-tag"></div>
+                <div class="desc-text" id="fortune-desc"></div>
+            </div>
+
+            <button class="btn" onclick="reset()">再次求籤</button>
+        </div>
+    </div>
+
+    <script>
+        const fortunes = [
+            { img: '1.png', title: '大吉', desc: '好運當頭，萬事如意，正是行動的好時機！' },
+            { img: '2.png', title: '中吉', desc: '運勢平穩上升，保持平常心，必有好事發生。' },
+            { img: '3.png', title: '小吉', desc: '微小而確實的幸福正在路途中，細心觀察周遭。' },
+            { img: '4.png', title: '末吉', desc: '雖然開頭緩慢，但只要堅持下去，終會開花結果。' },
+            { img: '5.png', title: '凶',   desc: '今日宜低調行事，凡事不宜強求，多喝水多休息。' }
+        ];
+
+        const colors = [
+            { name: '櫻桃紅', code: '#e74c3c' },
+            { name: '天空藍', code: '#3498db' },
+            { name: '森林綠', code: '#2ecc71' },
+            { name: '薰衣草紫', code: '#9b59b6' },
+            { name: '暖陽黃', code: '#f1c40f' },
+            { name: '珍珠白', code: '#bdc3c7' },
+            { name: '深邃黑', code: '#2c3e50' },
+            { name: '活力橘', code: '#e67e22' }
+        ];
+
+        let isDrawing = false;
+
+        function startDraw() {
+            if (isDrawing) return;
+            isDrawing = true;
+
+            const bucket = document.getElementById('drawZone');
+            const stick = document.getElementById('stick');
+
+            // 1. 播放搖晃動畫
+            bucket.classList.add('shaking');
+
+            // 2. 隨機決定結果
+            const fortune = fortunes[Math.floor(Math.random() * fortunes.length)];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+
+            setTimeout(() => {
+                // 3. 停止搖晃，籤支彈出
+                bucket.classList.remove('shaking');
+                stick.classList.add('stick-out');
+
+                setTimeout(() => {
+                    // 4. 顯示結果視窗
+                    showResult(fortune, color);
+                }, 600);
+            }, 1200);
+        }
+
+        function showResult(fortune, color) {
+            const overlay = document.getElementById('overlay');
+            const img = document.getElementById('fortune-img');
+            const colorTag = document.getElementById('lucky-color');
+            const desc = document.getElementById('fortune-desc');
+
+            img.src = fortune.img;
+            colorTag.innerText = color.name;
+            colorTag.style.backgroundColor = color.code;
+            desc.innerText = fortune.desc;
+
+            overlay.style.display = 'flex';
+        }
+
+        function reset() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('stick').classList.remove('stick-out');
+            isDrawing = false;
+        }
+    </script>
+</body>
+</html>
